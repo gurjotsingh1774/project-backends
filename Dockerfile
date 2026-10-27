@@ -17,8 +17,10 @@ RUN git clone --depth 1 ${SHADOW_ROOM_BACKEND_REPO} /build/shadow-room-backend \
 
 # --- Service: secure-token-allocation-backend ---
 ARG SECURE_TOKEN_ALLOCATION_BACKEND_REPO=https://github.com/gurjotsingh1774/secure-token-allocation-backend
-RUN git clone --depth 1 ${SECURE_TOKEN_ALLOCATION_BACKEND_REPO} /build/secure-token-allocation-backend \
+ARG SECURE_TOKEN_ALLOCATION_COMMIT=74c2031
+RUN git clone ${SECURE_TOKEN_ALLOCATION_BACKEND_REPO} /build/secure-token-allocation-backend \
     && cd /build/secure-token-allocation-backend \
+    && git checkout ${SECURE_TOKEN_ALLOCATION_COMMIT} \
     && go mod download \
     && CGO_ENABLED=0 GOOS=linux go build -v -ldflags='-s -w' -o /app/bin/secure-token-allocation .
 
