@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: unified-backend-mesh
+    runtime: docker
+    plan: starter
+    region: oregon
+    healthCheckPath: /healthz
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: PORT
+        value: 10000
+      # Shadow Room Backend variables (Configure Upstash / Managed Redis)
+      - key: VAULT_ADDRESS
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: GRID_ORIGIN
+        value: '*'
+      - key: HANDSHAKE_TTL_SECONDS
+        value: 60
+      # Secure Token Allocation Backend variables
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mesh-postgres
+          property: connectionString
+      - key: AES_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: QR_HMAC_SECRET
+        generateValue: true
+      - key: SUPER_ADMIN_USERNAME
+        value: admin
+      - key: SUPER_ADMIN_PASSWORD
+        generateValue: true
+
+databases:
+  - name: mesh-postgres
+    plan: free
+    databaseName: token_db
+    user: token_user
+    region: oregon

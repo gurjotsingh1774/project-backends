@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Backend Unified Gateway | Render</title>
+    <style>
+        :root {
+            --bg: #0b0f19;
+            --surface: #151d2f;
+            --surface-hover: #1b263b;
+            --border: #23314d;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.2);
+            --success: #34d399;
+            --purple: #c084fc;
+            --amber: #fbbf24;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.6;
+            padding: 2rem 1.5rem;
+        }
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        header {
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+        .brand h1 {
+            font-size: 1.85rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .brand p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-top: 0.25rem;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.9rem;
+            background: rgba(52, 211, 153, 0.1);
+            border: 1px solid rgba(52, 211, 153, 0.25);
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            color: var(--success);
+            font-weight: 500;
+        }
+        .pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        .card:hover {
+            background: var(--surface-hover);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--accent-glow);
+        }
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-header h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+        }
+        .card-body {
+            padding: 1.5rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        .label {
+            color: var(--text-secondary);
+        }
+        code {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.85rem;
+            color: var(--accent);
+        }
+        .card-body a {
+            color: var(--accent);
+            text-decoration: none;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .card-body a:hover {
+            text-decoration: underline;
+        }
+        .badges {
+            display: flex;
+            gap: 0.4rem;
+        }
+        .badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-runtime { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+        .badge-http { background: rgba(56, 189, 248, 0.15); color: var(--accent); }
+        .badge-ws { background: rgba(192, 132, 252, 0.15); color: var(--purple); }
+        .badge-sse { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+        .card-footer {
+            padding: 1rem 1.5rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-top: 1px solid var(--border);
+        }
+        .btn {
+            display: inline-block;
+            width: 100%;
+            text-align: center;
+            padding: 0.55rem 1rem;
+            border-radius: 8px;
+            background: var(--accent);
+            color: #0b0f19;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .architecture-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .architecture-panel h2 {
+            font-size: 1.15rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .arch-flow {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .node {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .arrow {
+            color: var(--accent);
+            font-weight: bold;
+        }
+        footer {
+            margin-top: auto;
+            padding-top: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="brand">
+                <h1>Unified Backend Mesh</h1>
+                <p>Render Web Service &bull; Nginx Reverse Proxy &bull; Docker &bull; Supervisord</p>
+            </div>
+            <div class="status-pill">
+                <span class="pulse"></span>
+                <span>Gateway Active &bull; <a href="/healthz" style="color: inherit; text-decoration: underline;">/healthz</a></span>
+            </div>
+        </header>
+
+        <main>
+            <div class="grid">
+                
+        <div class="card">
+            <div class="card-header">
+                <h3>shadow-room-backend</h3>
+                <span class="badge badge-runtime">GO</span>
+            </div>
+            <div class="card-body">
+                <div class="metric"><span class="label">Public Route:</span> <code>/shadow-room/</code></div>
+                <div class="metric"><span class="label">Internal Port:</span> <code>8081</code></div>
+                <div class="metric"><span class="label">Protocols:</span> <span class="badges"><span class="badge badge-http">HTTP</span> <span class="badge badge-ws">WebSocket</span> </span></div>
+                <div class="metric"><span class="label">Source:</span> <a href="https://github.com/gurjotsingh1774/shadow-room-backend" target="_blank" rel="noopener">https://github.com/gurjotsingh1774/shadow-room-backend</a></div>
+            </div>
+            <div class="card-footer">
+                <a href="/shadow-room/" class="btn">Explore Endpoint &rarr;</a>
+            </div>
+        </div>
+        
+
+        <div class="card">
+            <div class="card-header">
+                <h3>secure-token-allocation-backend</h3>
+                <span class="badge badge-runtime">GO</span>
+            </div>
+            <div class="card-body">
+                <div class="metric"><span class="label">Public Route:</span> <code>/secure-tokens/</code></div>
+                <div class="metric"><span class="label">Internal Port:</span> <code>8082</code></div>
+                <div class="metric"><span class="label">Protocols:</span> <span class="badges"><span class="badge badge-http">HTTP</span>  <span class="badge badge-sse">SSE</span></span></div>
+                <div class="metric"><span class="label">Source:</span> <a href="https://github.com/gurjotsingh1774/secure-token-allocation-backend" target="_blank" rel="noopener">https://github.com/gurjotsingh1774/secure-token-allocation-backend</a></div>
+            </div>
+            <div class="card-footer">
+                <a href="/secure-tokens/" class="btn">Explore Endpoint &rarr;</a>
+            </div>
+        </div>
+        
+            </div>
+
+            <div class="architecture-panel">
+                <h2>Orchestration Architecture</h2>
+                <div class="arch-flow">
+                    <span class="node">Render Edge ($PORT)</span>
+                    <span class="arrow">&rarr;</span>
+                    <span class="node">Nginx Reverse Proxy</span>
+                    <span class="arrow">&rarr;</span>
+                    <span class="node">Supervisord (PID 1)</span>
+                    <span class="arrow">&rarr;</span>
+                    <span class="node">Isolated Local Services (127.0.0.1:808x)</span>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            Turnkey Orchestration generated for Render Deployment &bull; Zero Downtime Architecture
+        </footer>
+    </div>
+</body>
+</html>

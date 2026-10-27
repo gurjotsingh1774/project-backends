@@ -1,0 +1,137 @@
+# ==============================================================================
+# Nginx Dynamic Reverse Proxy Configuration Template
+# Render automatically injects ${PORT} into this file via envsubst at container boot
+# ==============================================================================
+
+worker_processes auto;
+error_log /dev/stderr warn;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+    multi_accept on;
+    use epoll;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # High-performance settings
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    client_max_body_size 64M;
+
+    # Logging directed to stdout for unified Render log streaming
+    log_format json_analytics escape=json '{'
+        '"time_local":"$time_local",'
+        '"remote_addr":"$remote_addr",'
+        '"request_method":"$request_method",'
+        '"request_uri":"$request_uri",'
+        '"status": "$status",'
+        '"body_bytes_sent":"$body_bytes_sent",'
+        '"request_time":"$request_time",'
+        '"http_referrer":"$http_referer",'
+        '"http_user_agent":"$http_user_agent"'
+    '}';
+
+    access_log /dev/stdout json_analytics;
+
+    # WebSocket connection upgrading map
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        ''      close;
+    }
+
+    # Gzip compression for API responses
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+    server {
+        # Dynamic port injection from Render environment
+        listen ${PORT} default_server;
+        listen [::]:${PORT} default_server;
+        server_name _;
+
+        # ------------------------------------------------------------
+        # Global Health Check Endpoint (Render Uptime & Blueprints)
+        # ------------------------------------------------------------
+        location /healthz {
+            access_log off;
+            default_type application/json;
+            return 200 '{"status":"healthy","runtime":"render","gateway":"nginx"}\n';
+        }
+
+        # ------------------------------------------------------------
+        # Service: shadow-room-backend
+        # Internal Port: 8081 | Path Stripping: Enabled
+        # ------------------------------------------------------------
+        location = /shadow-room {
+            return 301 /shadow-room/;
+        }
+
+        location /shadow-room/ {
+            # Strip route prefix before forwarding to backend service
+            rewrite ^/shadow-room/(.*)$ /$1 break;
+            proxy_pass http://127.0.0.1:8081;
+            proxy_http_version 1.1;
+
+            # Standard proxy headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Prefix /shadow-room;
+
+            # WebSocket protocol upgrade support
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_read_timeout 86400s;
+            proxy_send_timeout 86400s;
+        }
+
+        # ------------------------------------------------------------
+        # Service: secure-token-allocation-backend
+        # Internal Port: 8082 | Path Stripping: Enabled
+        # ------------------------------------------------------------
+        location = /secure-tokens {
+            return 301 /secure-tokens/;
+        }
+
+        location /secure-tokens/ {
+            # Strip route prefix before forwarding to backend service
+            rewrite ^/secure-tokens/(.*)$ /$1 break;
+            proxy_pass http://127.0.0.1:8082;
+            proxy_http_version 1.1;
+
+            # Standard proxy headers
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Prefix /secure-tokens;
+
+            # Server-Sent Events (SSE) streaming support (unbuffered)
+            proxy_buffering off;
+            proxy_cache off;
+            chunked_transfer_encoding on;
+        }
+
+        # ------------------------------------------------------------
+        # Root Gateway Landing & Developer Hub
+        # ------------------------------------------------------------
+        location / {
+            root /var/www/html;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+        }
+    }
+}
