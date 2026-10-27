@@ -4,10 +4,7 @@
 # ============================================================================
 
 # --- STAGE 1: Builder ---
-FROM golang:1.24-alpine AS builder
-
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+FROM golang:1.26-bookworm AS builder
 
 WORKDIR /build
 RUN mkdir -p /app/bin
@@ -16,7 +13,6 @@ RUN mkdir -p /app/bin
 ARG SHADOW_ROOM_BACKEND_REPO=https://github.com/gurjotsingh1774/shadow-room-backend
 RUN git clone --depth 1 ${SHADOW_ROOM_BACKEND_REPO} /build/shadow-room-backend \
     && cd /build/shadow-room-backend \
-    && (sed -i -E 's/^go 1\.2[5-9]/go 1.23/' go.mod 2>/dev/null || true) \
     && go mod download \
     && CGO_ENABLED=0 GOOS=linux go build -v -ldflags='-s -w' -o /app/bin/shadow-room ./cmd/server
 
@@ -24,7 +20,6 @@ RUN git clone --depth 1 ${SHADOW_ROOM_BACKEND_REPO} /build/shadow-room-backend \
 ARG SECURE_TOKEN_ALLOCATION_BACKEND_REPO=https://github.com/gurjotsingh1774/secure-token-allocation-backend
 RUN git clone --depth 1 ${SECURE_TOKEN_ALLOCATION_BACKEND_REPO} /build/secure-token-allocation-backend \
     && cd /build/secure-token-allocation-backend \
-    && (sed -i -E 's/^go 1\.2[5-9]/go 1.23/' go.mod 2>/dev/null || true) \
     && go mod download \
     && CGO_ENABLED=0 GOOS=linux go build -v -ldflags='-s -w' -o /app/bin/secure-token-allocation .
 
