@@ -17,7 +17,7 @@ RUN git clone --depth 1 ${SHADOW_ROOM_BACKEND_REPO} /build/shadow-room-backend \
 
 # --- Service: secure-token-allocation-backend ---
 ARG SECURE_TOKEN_ALLOCATION_BACKEND_REPO=https://github.com/gurjotsingh1774/secure-token-allocation-backend
-ARG SECURE_TOKEN_ALLOCATION_COMMIT=74c2031
+ARG SECURE_TOKEN_ALLOCATION_COMMIT=5b0282b
 RUN git clone ${SECURE_TOKEN_ALLOCATION_BACKEND_REPO} /build/secure-token-allocation-backend \
     && cd /build/secure-token-allocation-backend \
     && git checkout ${SECURE_TOKEN_ALLOCATION_COMMIT} \
