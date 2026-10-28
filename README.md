@@ -30,25 +30,26 @@ This turnkey deployment solves the multi-service deployment challenge by combini
 │   │  /               ──> Dark-mode Service Status Dashboard & Documentation        │   │
 │   │  /shadow-room/*  ──> Strips prefix ──> http://127.0.0.1:8081/* (WebSockets)   │   │
 │   │  /secure-tokens/*──> Strips prefix ──> http://127.0.0.1:8082/* (SSE Streaming) │   │
+│   │  /data-pulse/*   ──> Strips prefix ──> http://127.0.0.1:8083/* (GraphQL & SSE) │   │
 │   └───────────────────────────────┬────────────────────────┬───────────────────────┘   │
 │                                   │                        │                           │
 │                                   ▼                        ▼                           │
 │   ┌────────────────────────────────────────────────────────────────────────────────┐   │
 │   │                        Supervisord Process Manager (PID 1)                     │   │
 │   │                                                                                │   │
-│   │  ┌───────────────────────────────┐          ┌───────────────────────────────┐  │   │
-│   │  │   shadow-room-backend         │          │ secure-token-allocation       │  │   │
-│   │  │   Go HTTP & WebSocket Server  │          │ Go Gin & GORM REST + SSE API  │  │   │
-│   │  │   Internal Port: 8081         │          │ Internal Port: 8082           │  │   │
-│   │  └───────────────┬───────────────┘          └───────────────┬───────────────┘  │   │
-│   └──────────────────┼──────────────────────────────────────────┼──────────────────┘   │
-└──────────────────────┼──────────────────────────────────────────┼──────────────────────┘
-                       │                                          │
-                       ▼                                          ▼
-            ┌──────────────────────┐                   ┌──────────────────────┐
-            │  Redis Store / Vault │                   │ PostgreSQL Database  │
-            │  (Upstash / Render)  │                   │ (Render / Supabase)  │
-            └──────────────────────┘                   └──────────────────────┘
+│   │  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐  │   │
+│   │  │ shadow-room-backend  │  │ secure-token-alloc   │  │ data-pulse-backend   │  │   │
+│   │  │ Go HTTP & WebSocket  │  │ Go REST + SSE API    │  │ Python Flask/GraphQL │  │   │
+│   │  │ Port: 8081           │  │ Port: 8082           │  │ Port: 8083 (Gunicorn)│  │   │
+│   │  └──────────┬───────────┘  └──────────┬───────────┘  └──────────┬───────────┘  │   │
+│   └─────────────┼─────────────────────────┼─────────────────────────┼──────────────┘   │
+└─────────────────┼─────────────────────────┼─────────────────────────┼──────────────────┘
+                  │                         │                         │
+                  ▼                         ▼                         ▼
+       ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
+       │  Redis Store / Vault │  │ PostgreSQL Database  │  │ Redis & DB (Shared)  │
+       │  (Upstash / Render)  │  │ (Render / Supabase)  │  │ (Telemetry Stream)   │
+       └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
 ```
 
 ---
@@ -59,6 +60,7 @@ This turnkey deployment solves the multi-service deployment challenge by combini
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`shadow-room-backend`** | [`gurjotsingh1774/shadow-room-backend`](https://github.com/gurjotsingh1774/shadow-room-backend) | `/shadow-room/` | `8081` | Go 1.24 (Static) | HTTP REST, WebSockets (`/ws`) | Redis (`VAULT_ADDRESS`) |
 | **`secure-token-allocation-backend`** | [`gurjotsingh1774/secure-token-allocation-backend`](https://github.com/gurjotsingh1774/secure-token-allocation-backend) | `/secure-tokens/` | `8082` | Go 1.24 (Static) | HTTP REST, Server-Sent Events (SSE) | PostgreSQL (`DATABASE_URL`) |
+| **`data-pulse-backend`** | [`gurjotsingh1774/data-pulse-backend`](https://github.com/gurjotsingh1774/data-pulse-backend) | `/data-pulse/` | `8083` | Python 3.12 / Gunicorn | HTTP REST, GraphQL, SSE (`/events`) | PostgreSQL (`DATABASE_URL`), Redis (`REDIS_URL`) |
 
 ---
 
@@ -75,6 +77,9 @@ Nginx intercepts incoming paths, strips the route prefix, and forwards the clean
 | `GET /secure-tokens/api/health` | `http://127.0.0.1:8082/api/health` | Prefix stripped |
 | `GET /secure-tokens/api/public/allocations/stream` | `http://127.0.0.1:8082/api/public/allocations/stream` | Unbuffered SSE (`proxy_buffering off`) |
 | `POST /secure-tokens/api/admin/auth/login` | `http://127.0.0.1:8082/api/admin/auth/login` | Signed Cookie Auth |
+| `GET /data-pulse/health` | `http://127.0.0.1:8083/health` | Prefix stripped, Health & DB Check |
+| `POST /data-pulse/graphql` | `http://127.0.0.1:8083/graphql` | GraphQL Schema & Query Execution |
+| `GET /data-pulse/events` | `http://127.0.0.1:8083/events` | Telemetry SSE Stream (`proxy_buffering off`) |
 
 *Missing trailing slashes (e.g. `/shadow-room`) are automatically redirected to canonical paths (`/shadow-room/`) with HTTP 301.*
 
@@ -131,7 +136,10 @@ The included `render.yaml` automatically sets up the Web Service, creates a mana
 | `QR_HMAC_SECRET` | `secure-tokens`| 256-bit HMAC secret for ticket QR code signatures | Pre-generated 64-char hex |
 | `SUPER_ADMIN_USERNAME` | `secure-tokens`| Initial super administrator username | `admin` |
 | `SUPER_ADMIN_PASSWORD` | `secure-tokens`| Initial super administrator password | Complex generated password |
-| `DATABASE_URL` | `secure-tokens`| PostgreSQL connection string | Dummy Render Postgres URL *(see notes below)* |
+| `DATABASE_URL` | `secure-tokens` | PostgreSQL connection string for secure tokens | Render Postgres / Supabase URL |
+| `DATA_PULSE_DATABASE_URL` | `data-pulse` | Dedicated PostgreSQL connection string (falls back to `DATABASE_URL` / SQLite) | Render Postgres / Supabase URL |
+| `REDIS_URL` | `data-pulse` | Redis connection URL for caching & pub/sub | Auto-mapped from `VAULT_ADDRESS` |
+| `REDIS_CACHE_TTL` | `data-pulse` | Cache time-to-live for GraphQL queries in seconds | `10` |
 
 ---
 

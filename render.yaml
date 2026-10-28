@@ -34,6 +34,13 @@ services:
         value: admin
       - key: SUPER_ADMIN_PASSWORD
         generateValue: true
+      # DataPulse Backend variables
+      - key: DATA_PULSE_DATABASE_URL
+        fromDatabase:
+          name: mesh-postgres
+          property: connectionString
+      - key: REDIS_CACHE_TTL
+        value: 10
 
 databases:
   - name: mesh-postgres

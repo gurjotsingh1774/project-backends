@@ -36,6 +36,18 @@ RUN if [ -n "${SECURE_TOKEN_ALLOCATION_COMMIT}" ] && [ "${SECURE_TOKEN_ALLOCATIO
     && go mod download \
     && CGO_ENABLED=0 GOOS=linux go build -v -ldflags='-s -w' -o /app/bin/secure-token-allocation .
 
+# --- Service: data-pulse-backend ---
+ARG DATA_PULSE_BACKEND_REPO=https://github.com/gurjotsingh1774/data-pulse-backend
+ARG DATA_PULSE_COMMIT=latest
+RUN if [ -n "${DATA_PULSE_COMMIT}" ] && [ "${DATA_PULSE_COMMIT}" != "latest" ] && [ "${DATA_PULSE_COMMIT}" != "HEAD" ]; then \
+        git clone ${DATA_PULSE_BACKEND_REPO} /build/data-pulse-backend \
+        && cd /build/data-pulse-backend \
+        && git checkout ${DATA_PULSE_COMMIT}; \
+    else \
+        git clone --depth 1 ${DATA_PULSE_BACKEND_REPO} /build/data-pulse-backend \
+        && cd /build/data-pulse-backend; \
+    fi
+
 # --- STAGE 2: Production Runtime ---
 FROM alpine:3.21
 
@@ -46,14 +58,26 @@ RUN apk add --no-cache \
     curl \
     ca-certificates \
     tzdata \
-    bash
+    bash \
+    python3 \
+    py3-pip \
+    py3-virtualenv \
+    libpq
 
 WORKDIR /app
-RUN mkdir -p /app/bin /etc/supervisor/conf.d /etc/nginx/templates /run/nginx /var/log/supervisor /var/log/nginx /var/www/html
+RUN mkdir -p /app/bin /app/data-pulse-backend /etc/supervisor/conf.d /etc/nginx/templates /run/nginx /var/log/supervisor /var/log/nginx /var/www/html
 
-# Copy compiled binaries from builder
+# Copy compiled Go binaries from builder
 COPY --from=builder /app/bin/ /app/bin/
 RUN chmod +x /app/bin/*
+
+# Copy data-pulse-backend and install Python dependencies in virtualenv
+COPY --from=builder /build/data-pulse-backend /app/data-pulse-backend
+RUN apk add --no-cache --virtual .build-deps gcc musl-dev libpq-dev python3-dev \
+    && python3 -m venv /app/data-pulse-backend/venv \
+    && /app/data-pulse-backend/venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /app/data-pulse-backend/venv/bin/pip install --no-cache-dir -r /app/data-pulse-backend/requirements.txt \
+    && apk del .build-deps
 
 # Copy configuration templates & entrypoint
 COPY nginx/nginx.conf.template /etc/nginx/nginx.conf.template

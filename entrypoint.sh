@@ -9,6 +9,12 @@ echo "=========================================================="
 export PORT="${PORT:-10000}"
 echo "[*] Ingress Port configured: ${PORT}"
 
+# Automatically propagate Redis URL to REDIS_URL for services like data-pulse if VAULT_ADDRESS is configured
+if [ -z "${REDIS_URL}" ] && [ -n "${VAULT_ADDRESS}" ]; then
+    export REDIS_URL="${VAULT_ADDRESS}"
+    echo "[*] Mapped VAULT_ADDRESS to REDIS_URL for multi-service telemetry caching"
+fi
+
 # Template Nginx configuration using envsubst
 echo "[*] Interpolating Nginx configuration template..."
 envsubst '${PORT}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
